@@ -2,13 +2,13 @@
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, {chat_client, chat_server, []}},
+  {mod, {simple_chat_server_demo, []}},
   {applications,
    [kernel,
     stdlib
    ]},
   {env,[]},
-  {modules, []},
+  {modules, [chat_client, chat_server, user_interface, user_manager]},
 
   {licenses, ["Apache-2.0"]},
   {links, []}
