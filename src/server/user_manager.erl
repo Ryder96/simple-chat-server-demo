@@ -1,7 +1,7 @@
 -module(user_manager).
 
 -export([user_manager/2]).
--include("shared/mess_interface.hrl").
+-include("../shared/mess_interface.hrl").
 
 user_manager(MessageHandler, Users) ->
     receive
@@ -16,22 +16,72 @@ user_manager(MessageHandler, Users) ->
                         }
                         | Users
                     ],
-                    MessageHandler ! {Socket, #ok{info = logged}},
+                    MessageHandler ! #direct_message{socket = Socket, message = #ok{info = logged}},
                     user_manager(MessageHandler, New_User_List);
                 User ->
                     io:format("~p~n", [User]),
                     io:format("someone with the ~p is already logged at ~p change name~n", [
                         User#user_state.name, User#user_state.socket
                     ]),
-                    MessageHandler ! {Socket, #error{message = "username already used"}},
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #error{message = "username already used"}
+                        },
                     user_manager(MessageHandler, Users)
             end;
         {Socket, logout} ->
             case lists:keytake(Socket, #user_state.socket, Users) of
                 false ->
                     user_manager(MessageHandler, Users);
-                {_, _, New_User_List} ->
+                {_, State, New_User_List} ->
+                    rooms_manager ! {exit, State#user_state.room},
                     user_manager(MessageHandler, New_User_List)
-            end
+            end;
+        {Socket, exit_room, User} ->
+            UserState = lists:keyfind(User, #user_state.name, Users),
+            case UserState#user_state.room of
+                lobby ->
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #system{message = "you are not in a room"}
+                        };
+                RoomName ->
+                    rooms_manager ! {RoomName, exit, User},
+                    Users2 = lists:map(
+                        fun
+                            (State) when State#user_state.name == User ->
+                                NewUserState = State#user_state{room = lobby},
+                                NewUserState;
+                            (State) ->
+                                State
+                        end,
+                        Users
+                    ),
+                    user_manager(MessageHandler, Users2)
+            end;
+        {Socket, message, {Sender, Message}} ->
+            UserState = lists:keyfind(Sender, #user_state.name, Users),
+            case UserState#user_state.room of
+                lobby ->
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #error{message = "you are not in a room"}
+                        };
+                RoomName ->
+                    rooms_manager !
+                        {RoomName, message, {Sender, Message}}
+            end;
+        #update_user_room{user = User, new_room = RoomName} ->
+            Users2 = lists:map(
+                fun
+                    (UserState) when UserState#user_state.name == User ->
+                        NewUserState = UserState#user_state{room = RoomName},
+                        NewUserState;
+                    (UserState) ->
+                        UserState
+                end,
+                Users
+            ),
+            user_manager(MessageHandler, Users2)
     end,
     user_manager(MessageHandler, Users).

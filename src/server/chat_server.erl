@@ -2,14 +2,18 @@
 
 -export([start/0, server/1, loop/1, message_handler/0]).
 
--include("config/chat_config.hrl").
--include("shared/mess_interface.hrl").
+-include("../config/chat_config.hrl").
+-include("../shared/mess_interface.hrl").
 %%%
 %%% starts N sever that listen on the server port configured on settings
 %%%
 start() ->
     MessageHandlerPid = spawn(chat_server, message_handler, []),
     link(MessageHandlerPid),
+
+    RoomManagerPid = spawn(rooms_manager, manage, [MessageHandlerPid, []]),
+    link(RoomManagerPid),
+    register(rooms_manager, RoomManagerPid),
 
     UserManagerPid = spawn(user_manager, user_manager, [MessageHandlerPid, []]),
     link(UserManagerPid),
@@ -68,11 +72,22 @@ loop(Socket) ->
 process(Socket, Data) ->
     DecodedData = binary_to_term(Data),
     case DecodedData of
-        #login{username = Name} ->
-            user_manager ! {Socket, login, Name}
+        #login{username = User} ->
+            user_manager ! {Socket, login, User};
+        #message{sender=Sender, body=Message} ->
+            user_manager ! {Socket, message, {Sender, Message}};
+        %%% room handler
+        #create_room{requester = Requester, room_name = RoomName} ->
+            rooms_manager ! {Socket, create, {Requester, RoomName}};
+        #destroy_room{requester = Requester, room_name = RoomName} ->
+            rooms_manager ! {Socket, destroy, {Requester, RoomName}};
+        #enter_room{requester = Requester, room_name = RoomName} ->
+            rooms_manager ! {Socket, enter, {Requester, RoomName}};
+        #exit_room{user = User} ->
+            user_manager ! {Socket, exit_room, User};
+        #list_rooms{requester=_} ->
+            rooms_manager ! {Socket, list}
     end.
-
-
 
 %%%
 %%% Send messages to the client
@@ -80,8 +95,16 @@ process(Socket, Data) ->
 
 message_handler() ->
     receive
-        {Socket, Message} ->
-            gen_tcp:send(Socket, term_to_binary(Message))
+        #direct_message{socket = Socket, message = Message} ->
+            gen_tcp:send(Socket, term_to_binary(Message));
+        #broadcast_message{clients = Clients, message = Message} ->
+            broadcast_message(Clients, Message)
     end,
     message_handler().
 
+broadcast_message([], _) ->
+    ok;
+broadcast_message([{_, Socket} | T], Message) ->
+    io:format("broadcasting message~n"),
+    gen_tcp:send(Socket, term_to_binary(Message)),
+    broadcast_message(T, Message).

@@ -1,15 +1,14 @@
-{application, simple_chat_server_demo,
- [{description, "An OTP application"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, {simple_chat_server_demo, []}},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
-  {modules, [chat_client, chat_server, user_interface, user_manager]},
-
-  {licenses, ["Apache-2.0"]},
-  {links, []}
- ]}.
+{application, simple_chat_server_demo, [
+    {description, "An OTP application"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {simple_chat_server_demo, []}},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, [chat_client, chat_server, user_interface, user_manager, rooms_manager, room_manager]},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

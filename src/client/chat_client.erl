@@ -2,8 +2,8 @@
 
 -export([start/0, client/0, client/1, client/2]).
 
--include("config/chat_config.hrl").
--include("shared/mess_interface.hrl").
+-include("../config/chat_config.hrl").
+-include("../shared/mess_interface.hrl").
 
 %%%
 %%% Starts the chat client
@@ -69,6 +69,26 @@ client(Socket, Name) ->
         logout ->
             io:format("disconnected~n", []),
             exit(normal);
+        %%% message handler
+        {message, Message} ->
+            gen_tcp:send(Socket, term_to_binary(#message{sender = Name, body = Message}));
+        %%% room management
+        {create_room, RoomName} ->
+            gen_tcp:send(
+                Socket, term_to_binary(#create_room{requester = Name, room_name = RoomName})
+            );
+        {destroy_room, RoomName} ->
+            gen_tcp:send(
+                Socket, term_to_binary(#destroy_room{requester = Name, room_name = RoomName})
+            );
+        {enter_room, RoomName} ->
+            gen_tcp:send(
+                Socket, term_to_binary(#enter_room{requester = Name, room_name = RoomName})
+            );
+        exit_room ->
+            gen_tcp:send(Socket, term_to_binary(#exit_room{user = Name}));
+        list_rooms ->
+            gen_tcp:send(Socket, term_to_binary(#list_rooms{requester = Name}));
         close_client ->
             exit(normal)
     end,
@@ -89,7 +109,7 @@ receive_message(Binary) ->
             true;
         #ok{info = _, message = MsgBinary} ->
             Msg = lists:flatten(MsgBinary),
-            io:format("~p~n", [Msg]),
+            io:format("~s~n", [Msg]),
             true;
         #system{message = MsgBinary} ->
             Msg = lists:flatten(MsgBinary),
@@ -126,7 +146,7 @@ chat_listen(Socket) ->
 socket_error_handler(Socket, ErrorValue) ->
     case ErrorValue of
         {error, closed} ->
-            gen_tcp:send(Socket, "this socket is closing now"),
+            io:format("Server crashed disconnecting~n"),
             gen_tcp:close(Socket);
         {error, econnaborted} ->
             io:format("Connection aborted by peer.~n"),
