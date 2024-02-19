@@ -71,26 +71,32 @@ client(Socket, Name) ->
             exit(normal);
         %%% message handler
         {message, Message} ->
-            gen_tcp:send(Socket, term_to_binary(#message{sender = Name, message=Message}));
+            gen_tcp:send(Socket, term_to_binary(#message{sender = Name, message = Message}));
         {whisper, Dst, Message} ->
-            gen_tcp:send(Socket, term_to_binary(#whisper{sender=Name, dst=Dst, message=Message}));
+            gen_tcp:send(
+                Socket, term_to_binary(#whisper{sender = Name, dst = Dst, message = Message})
+            );
         %%% room management
-        {create_room, RoomName} ->
+        {create_room, Room} ->
             gen_tcp:send(
-                Socket, term_to_binary(#create_room{requester = Name, room_name = RoomName})
+                Socket, term_to_binary(#create_room{requester = Name, room = Room})
             );
-        {destroy_room, RoomName} ->
+        {destroy_room, Room} ->
             gen_tcp:send(
-                Socket, term_to_binary(#destroy_room{requester = Name, room_name = RoomName})
+                Socket, term_to_binary(#destroy_room{requester = Name, room = Room})
             );
-        {enter_room, RoomName} ->
+        {enter_room, Room} ->
             gen_tcp:send(
-                Socket, term_to_binary(#enter_room{requester = Name, room_name = RoomName})
+                Socket, term_to_binary(#enter_room{requester = Name, room = Room})
             );
         exit_room ->
             gen_tcp:send(Socket, term_to_binary(#exit_room{user = Name}));
         list_rooms ->
             gen_tcp:send(Socket, term_to_binary(#list_rooms{requester = Name}));
+        {invite, {Guest, RoomName}} ->
+            gen_tcp:send(
+                Socket, term_to_binary(#invite{host = Name, guest = Guest, room_name = RoomName})
+            );
         close_client ->
             exit(normal)
     end,
@@ -115,7 +121,7 @@ receive_message(Binary) ->
             true;
         #system{message = MsgBinary} ->
             Msg = lists:flatten(MsgBinary),
-            io:format("~p~n", [Msg]),
+            io:format("~s~n", [Msg]),
             true;
         #alert{message = MsgBinary} ->
             Msg = lists:flatten(MsgBinary),

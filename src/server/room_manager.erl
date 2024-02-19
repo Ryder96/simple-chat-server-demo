@@ -1,16 +1,19 @@
 -module(room_manager).
 
--export([manage/4]).
+-export([room_manager/4]).
 
 -include("../shared/mess_interface.hrl").
 
-manage(MessageHandler, Owner, RoomName, Users) ->
+room_manager(MessageHandler, Owner, RoomName, Users) ->
     receive
         {enter, {Socket, User}} ->
             case lists:keyfind(User, 1, Users) of
                 false ->
                     Users2 = [{User, Socket} | Users],
-                    user_manager ! #update_user_room{user=User, new_room=RoomName},
+                    user_manager !
+                        #update_user_room{
+                            user = User, new_room = #room{name = RoomName, type = public}
+                        },
                     MessageHandler !
                         #broadcast_message{
                             clients = Users,
@@ -21,13 +24,13 @@ manage(MessageHandler, Owner, RoomName, Users) ->
                         #direct_message{
                             socket = Socket, message = #ok{message = "you entered the room"}
                         },
-                    manage(MessageHandler, Owner, RoomName, Users2);
+                    room_manager(MessageHandler, Owner, RoomName, Users2);
                 _ ->
                     MessageHandler !
                         #direct_message{
                             socket = Socket, message = #error{message = "already in room"}
                         },
-                    manage(MessageHandler, Owner, RoomName, Users)
+                    room_manager(MessageHandler, Owner, RoomName, Users)
             end;
         {exit, User} ->
             Users2 = lists:keydelete(User, 1, Users),
@@ -37,13 +40,13 @@ manage(MessageHandler, Owner, RoomName, Users) ->
                     message =
                         #system{message = io_lib:format("~p exit the room", [User])}
                 },
-            manage(MessageHandler, Owner, RoomName, Users2);
+            room_manager(MessageHandler, Owner, RoomName, Users2);
         {message, Sender, Message} ->
             MessageHandler !
                 #broadcast_message{
                     clients = Users,
                     message =
-                        #ok{message = io_lib:format("~p:~s", [Sender, Message])}
+                        #ok{message = io_lib:format("~s:~s", [Sender, Message])}
                 };
         terminate ->
             MessageHandler !
@@ -55,7 +58,7 @@ manage(MessageHandler, Owner, RoomName, Users) ->
             kick_everyone(Users),
             exit(normal)
     end,
-    manage(MessageHandler, Owner, RoomName, Users).
+    room_manager(MessageHandler, Owner, RoomName, Users).
 
 kick_everyone([]) ->
     ok;

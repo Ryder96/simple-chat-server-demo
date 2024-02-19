@@ -11,9 +11,9 @@ start() ->
     MessageHandlerPid = spawn(chat_server, message_handler, []),
     link(MessageHandlerPid),
 
-    RoomManagerPid = spawn(rooms_manager, manage, [MessageHandlerPid, []]),
-    link(RoomManagerPid),
-    register(rooms_manager, RoomManagerPid),
+    RoomsManagerPid = spawn(rooms_manager, manage, [MessageHandlerPid, [], []]),
+    link(RoomsManagerPid),
+    register(rooms_manager, RoomsManagerPid),
 
     UserManagerPid = spawn(user_manager, user_manager, [MessageHandlerPid, []]),
     link(UserManagerPid),
@@ -77,19 +77,22 @@ process(Socket, Data) ->
         %%% message handler
         #message{sender = Sender, message = Message} ->
             user_manager ! {Socket, message, {Sender, Message}};
-        #whisper{sender=Sender, dst=Dst,message=Message} ->
+        #whisper{sender = Sender, dst = Dst, message = Message} ->
             user_manager ! {Socket, whisper, {Sender, Dst, Message}};
         %%% room handler
-        #create_room{requester = Requester, room_name = RoomName} ->
-            rooms_manager ! {Socket, create, {Requester, RoomName}};
-        #destroy_room{requester = Requester, room_name = RoomName} ->
-            rooms_manager ! {Socket, destroy, {Requester, RoomName}};
-        #enter_room{requester = Requester, room_name = RoomName} ->
-            rooms_manager ! {Socket, enter, {Requester, RoomName}};
+        #create_room{requester = Requester, room = Room} ->
+            rooms_manager ! {Socket, create, {Requester, Room}};
+        #destroy_room{requester = Requester, room = Room} ->
+            rooms_manager ! {Socket, destroy, {Requester, Room}};
+        #enter_room{requester = Requester, room = Room} ->
+            rooms_manager ! {Socket, enter, {Requester, Room}};
         #exit_room{user = User} ->
             user_manager ! {Socket, exit_room, User};
-        #list_rooms{requester = _} ->
-            rooms_manager ! {Socket, list}
+        #list_rooms{requester = Requester} ->
+            rooms_manager ! {Socket, list},
+            user_manager ! {Socket, list_rooms, Requester};
+        #invite{host = Host, guest = Guest, room_name = RoomName} ->
+            user_manager ! {Socket, invite_to_room, {Host, {Guest, RoomName}}}
     end.
 
 %%%

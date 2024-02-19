@@ -4,6 +4,8 @@
 
 -export([create_room/1, destroy_room/1, enter_room/1, exit_room/0, list_rooms/0]).
 
+-export([create_pvt_room/1, destroy_pvt_room/1, enter_pvt_room/1, invite_pvt_room/2]).
+
 -export([send_message/1, whisper/2]).
 
 -include("../shared/mess_interface.hrl").
@@ -21,19 +23,37 @@ logout() ->
     end.
 create_room(RoomName) ->
     case check_client_is_running() of
-        true -> mess_client ! {create_room, RoomName};
+        true -> mess_client ! {create_room, #room{type=public, name=RoomName}};
+        false -> error("client is not running")
+    end.
+
+create_pvt_room(RoomName) ->
+    case check_client_is_running() of
+        true -> mess_client ! {create_room, #room{type=private,name=RoomName}};
         false -> error("client is not running")
     end.
 
 destroy_room(RoomName) ->
     case check_client_is_running() of
-        true -> mess_client ! {destroy_room, RoomName};
+        true -> mess_client ! {destroy_room,#room{type=public, name=RoomName}};
+        false -> error("client is not running")
+    end.
+
+destroy_pvt_room(RoomName) ->
+    case check_client_is_running() of
+        true -> mess_client ! {destroy_room,#room{type=private, name=RoomName}};
         false -> error("client is not running")
     end.
 
 enter_room(RoomName) ->
     case check_client_is_running() of
-        true -> mess_client ! {enter_room, RoomName};
+        true -> mess_client ! {enter_room, #room{type=public, name=RoomName}};
+        false -> error("client is not running")
+    end.
+
+enter_pvt_room(RoomName) ->
+    case check_client_is_running() of
+        true -> mess_client ! {enter_room, #room{type=private, name=RoomName}};
         false -> error("client is not running")
     end.
 
@@ -49,6 +69,12 @@ list_rooms() ->
         false -> error("client is not running")
     end.
 
+invite_pvt_room(Guest, RoomName) ->
+    case check_client_is_running() of
+        true -> mess_client ! {invite, {Guest, RoomName}};
+        false -> error("client is not running")
+    end.
+
 send_message(Message) ->
     case check_client_is_running() of
         true -> mess_client ! {message, Message};
@@ -60,6 +86,7 @@ whisper(Dst, Message) ->
         true -> mess_client ! {whisper, Dst, Message};
         false -> error("client is not running")
     end.
+
 
 check_client_is_running() ->
     case whereis(mess_client) of

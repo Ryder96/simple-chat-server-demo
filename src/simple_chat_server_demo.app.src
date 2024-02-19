@@ -8,7 +8,15 @@
         stdlib
     ]},
     {env, []},
-    {modules, [chat_client, chat_server, user_interface, user_manager, rooms_manager, room_manager]},
+    {modules, [
+        chat_client,
+        chat_server,
+        user_interface,
+        user_manager,
+        rooms_manager,
+        room_manager,
+        pvt_room_manager
+    ]},
     {licenses, ["Apache-2.0"]},
     {links, []}
 ]}.
