@@ -74,8 +74,11 @@ process(Socket, Data) ->
     case DecodedData of
         #login{username = User} ->
             user_manager ! {Socket, login, User};
-        #message{sender=Sender, body=Message} ->
+        %%% message handler
+        #message{sender = Sender, message = Message} ->
             user_manager ! {Socket, message, {Sender, Message}};
+        #whisper{sender=Sender, dst=Dst,message=Message} ->
+            user_manager ! {Socket, whisper, {Sender, Dst, Message}};
         %%% room handler
         #create_room{requester = Requester, room_name = RoomName} ->
             rooms_manager ! {Socket, create, {Requester, RoomName}};
@@ -85,7 +88,7 @@ process(Socket, Data) ->
             rooms_manager ! {Socket, enter, {Requester, RoomName}};
         #exit_room{user = User} ->
             user_manager ! {Socket, exit_room, User};
-        #list_rooms{requester=_} ->
+        #list_rooms{requester = _} ->
             rooms_manager ! {Socket, list}
     end.
 

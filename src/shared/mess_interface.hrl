@@ -7,7 +7,8 @@
 -record(enter_room, {requester, room_name}).
 -record(list_rooms, {requester}).
 -record(exit_room, {user}).
--record(message, {sender, body}).
+-record(message, {sender, message}).
+-record(whisper, {sender, dst, message}).
 
 %%%
 %%% Server responses

@@ -4,7 +4,7 @@
 
 -export([create_room/1, destroy_room/1, enter_room/1, exit_room/0, list_rooms/0]).
 
--export([send_message/1]).
+-export([send_message/1, whisper/2]).
 
 -include("../shared/mess_interface.hrl").
 
@@ -21,7 +21,7 @@ logout() ->
     end.
 create_room(RoomName) ->
     case check_client_is_running() of
-        true ->  mess_client ! {create_room, RoomName};
+        true -> mess_client ! {create_room, RoomName};
         false -> error("client is not running")
     end.
 
@@ -52,6 +52,12 @@ list_rooms() ->
 send_message(Message) ->
     case check_client_is_running() of
         true -> mess_client ! {message, Message};
+        false -> error("client is not running")
+    end.
+
+whisper(Dst, Message) ->
+    case check_client_is_running() of
+        true -> mess_client ! {whisper, Dst, Message};
         false -> error("client is not running")
     end.
 

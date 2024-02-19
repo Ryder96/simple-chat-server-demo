@@ -59,6 +59,7 @@ user_manager(MessageHandler, Users) ->
                     ),
                     user_manager(MessageHandler, Users2)
             end;
+        %%% message handler
         {Socket, message, {Sender, Message}} ->
             UserState = lists:keyfind(Sender, #user_state.name, Users),
             case UserState#user_state.room of
@@ -82,6 +83,24 @@ user_manager(MessageHandler, Users) ->
                 end,
                 Users
             ),
-            user_manager(MessageHandler, Users2)
+            user_manager(MessageHandler, Users2);
+        {Socket, whisper, {User, Dst, Message}} ->
+            case lists:keyfind(Dst, #user_state.name, Users) of
+                false ->
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket,
+                            message = #system{message = io_lib:format("~s is not logged", [Dst])}
+                        };
+                DstState ->
+                    MessageHandler !
+                        #direct_message{
+                            socket = DstState#user_state.socket,
+                            message = #ok{
+                                message = io_lib:format("[whisper] ~s: ~s", [User, Message])
+                            }
+                        }
+            end,
+            user_manager(MessageHandler, Users)
     end,
     user_manager(MessageHandler, Users).

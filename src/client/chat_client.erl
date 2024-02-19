@@ -71,7 +71,9 @@ client(Socket, Name) ->
             exit(normal);
         %%% message handler
         {message, Message} ->
-            gen_tcp:send(Socket, term_to_binary(#message{sender = Name, body = Message}));
+            gen_tcp:send(Socket, term_to_binary(#message{sender = Name, message=Message}));
+        {whisper, Dst, Message} ->
+            gen_tcp:send(Socket, term_to_binary(#whisper{sender=Name, dst=Dst, message=Message}));
         %%% room management
         {create_room, RoomName} ->
             gen_tcp:send(
@@ -146,7 +148,7 @@ chat_listen(Socket) ->
 socket_error_handler(Socket, ErrorValue) ->
     case ErrorValue of
         {error, closed} ->
-            io:format("Server crashed disconnecting~n"),
+            io:format("Connection closed bye bye~n"),
             gen_tcp:close(Socket);
         {error, econnaborted} ->
             io:format("Connection aborted by peer.~n"),
