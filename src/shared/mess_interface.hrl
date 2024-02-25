@@ -29,10 +29,17 @@
 %%%
 
 -record(user_state, {name, socket, room, room_type, pvt_rooms}).
--record(room_state, {name, owner, room_pid, type}).
+-record(room_state, {name, owner, room_pid, type, authorized}).
 
 %%%
 %%% User manager records
 %%%
 
 -record(update_user_room, {user, new_room, room_type}).
+
+
+%%%
+%%% Messages saved on dynamodb
+%%%
+
+-record(message_ddb, {sender, body, timestamp}).

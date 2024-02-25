@@ -11,7 +11,7 @@ start() ->
     MessageHandlerPid = spawn(chat_server, message_handler, []),
     link(MessageHandlerPid),
 
-    RoomsManagerPid = spawn(rooms_manager, manage, [MessageHandlerPid, [], []]),
+    RoomsManagerPid = spawn(rooms_manager, start, [MessageHandlerPid]),
     link(RoomsManagerPid),
     register(rooms_manager, RoomsManagerPid),
 
@@ -89,8 +89,7 @@ process(Socket, Data) ->
         #exit_room{user = User} ->
             user_manager ! {Socket, exit_room, User};
         #list_rooms{requester = Requester} ->
-            rooms_manager ! {Socket, list},
-            user_manager ! {Socket, list_rooms, Requester};
+            rooms_manager ! {Socket, Requester,list};
         #invite{host = Host, guest = Guest, room_name = RoomName} ->
             user_manager ! {Socket, invite_to_room, {Host, {Guest, RoomName}}}
     end.

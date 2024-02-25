@@ -24,9 +24,23 @@ room_manager(MessageHandler, Owner, RoomName, Authorized, Users) ->
                                         message = io_lib:format("~s enter the room", [User])
                                     }
                                 },
+                            OldMessages = chat_server_dynamodb:fetch_messages(RoomName, Owner),
+                            Messages = lists:map(
+                                fun(Message) ->
+                                    Message#message_ddb.sender ++ ": " ++ Message#message_ddb.body
+                                end,
+                                OldMessages
+                            ),
+
                             MessageHandler !
                                 #direct_message{
                                     socket = Socket, message = #ok{message = "you entered the room"}
+                                },
+
+                            MessageHandler !
+                                #direct_message{
+                                    socket = Socket,
+                                    message = #ok{message = Messages, info = print_list}
                                 },
                             room_manager(MessageHandler, Owner, RoomName, Authorized, Users2);
                         _ ->
@@ -55,6 +69,7 @@ room_manager(MessageHandler, Owner, RoomName, Authorized, Users) ->
                 false ->
                     user_manager ! {authorize, Guest, RoomName},
                     AuthorizedUpdated = [Guest | Authorized],
+                    chat_server_dynamodb:authorize(RoomName, Owner, Guest),
                     room_manager(MessageHandler, Owner, RoomName, AuthorizedUpdated, Users);
                 _ ->
                     MessageHandler !
@@ -66,6 +81,9 @@ room_manager(MessageHandler, Owner, RoomName, Authorized, Users) ->
                         }
             end;
         {message, Sender, Message} ->
+            chat_server_dynamodb:save_message(RoomName, Owner, #message{
+                sender = Sender, message = Message
+            }),
             MessageHandler !
                 #broadcast_message{
                     clients = Users,

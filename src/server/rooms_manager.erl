@@ -1,14 +1,42 @@
 -module(rooms_manager).
 
--export([manage/3]).
+-export([start/1, manage/3]).
 
 -include("../shared/mess_interface.hrl").
+
+start(MessageHandler) ->
+    chat_server_dynamodb:start(),
+    FetchPublicRooms = chat_server_dynamodb:fetch_rooms(public),
+    FetchPrivateRooms = chat_server_dynamodb:fetch_rooms(private),
+
+    PublicRooms = start_room_manager(MessageHandler, FetchPublicRooms),
+    PrivateRooms = start_room_manager(MessageHandler, FetchPrivateRooms),
+
+    manage(MessageHandler, PublicRooms, PrivateRooms).
+
+start_room_manager(_, []) ->
+    [];
+start_room_manager(MessageHandler, [H | T]) ->
+    case H#room_state.type of
+        public ->
+            RoomMng_Pid = spawn(room_manager, room_manager, [
+                MessageHandler, H#room_state.owner, H#room_state.name, []
+            ]),
+            NewRoom = H#room_state{room_pid = RoomMng_Pid},
+            [NewRoom | start_room_manager(MessageHandler, T)];
+        private ->
+            RoomMng_Pid = spawn(pvt_room_manager, room_manager, [
+                MessageHandler, H#room_state.owner, H#room_state.name, H#room_state.authorized, []
+            ]),
+            NewRoom = H#room_state{room_pid = RoomMng_Pid},
+            [NewRoom | start_room_manager(MessageHandler, T)]
+    end.
 
 manage(MessageHandler, PublicRooms, PrivateRooms) ->
     receive
         {Socket, create, {Owner, Room}} when Room#room.type == public ->
-            case lists:keyfind(Room#room.name, #room_state.name, PublicRooms) of
-                false ->
+            case chat_server_dynamodb:create_room(Room#room.name, Owner) of
+                {ok, _} ->
                     %%% create new room
                     RoomMng_Pid = spawn(room_manager, room_manager, [
                         MessageHandler, Owner, Room#room.name, []
@@ -22,7 +50,7 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                             socket = Socket, message = #ok{message = "room created succefully"}
                         },
                     manage(MessageHandler, Rooms2, PrivateRooms);
-                _ ->
+                {error, _} ->
                     MessageHandler !
                         #direct_message{
                             socket = Socket,
@@ -34,16 +62,8 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                         }
             end;
         {Socket, create, {Owner, Room}} when Room#room.type == private ->
-            case
-                lists:keyfind(
-                    Room#room.name,
-                    #room_state.name,
-                    lists:filter(
-                        fun(RoomState) -> RoomState#room_state.owner == Owner end, PrivateRooms
-                    )
-                )
-            of
-                false ->
+            case chat_server_dynamodb:create_room(Room#room.name, Owner, private) of
+                {ok, _} ->
                     %%% create new room
                     RoomMng_Pid = spawn(pvt_room_manager, room_manager, [
                         MessageHandler, Owner, Room#room.name, [Owner], []
@@ -58,7 +78,7 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                         },
                     user_manager ! {authorize, Owner, Room#room.name},
                     manage(MessageHandler, PublicRooms, Rooms2);
-                _ ->
+                {error, _} ->
                     MessageHandler !
                         #direct_message{
                             socket = Socket,
@@ -164,7 +184,7 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                     FoundRoom#room_state.room_pid ! {message, Sender, Message}
             end,
             manage(MessageHandler, PublicRooms, PrivateRooms);
-        {Socket, list} ->
+        {Socket, Requester, list} ->
             case length(PublicRooms) of
                 0 ->
                     MessageHandler !
@@ -174,7 +194,7 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                 N ->
                     Names = lists:map(
                         fun(Room) ->
-                            io_lib:format("~w", [Room#room_state.name])
+                            Room#room_state.name
                         end,
                         PublicRooms
                     ),
@@ -183,6 +203,32 @@ manage(MessageHandler, PublicRooms, PrivateRooms) ->
                     MessageHandler !
                         #direct_message{
                             socket = Socket, message = #ok{message = Buffer, info = print_list}
+                        }
+            end,
+
+            case length(PrivateRooms) of
+                0 ->
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #ok{message = "no pvt rooms available"}
+                        };
+                PvtN ->
+                    PvtNames = lists:map(
+                        fun(Room) ->
+                            case lists:member(Requester, Room#room_state.authorized) of
+                                true ->
+                                    Room#room_state.name;
+                                false ->
+                                    []
+                            end
+                        end,
+                        PrivateRooms
+                    ),
+
+                    PvtBuffer = [io_lib:format("Private Room availables ~p:", [PvtN]) | PvtNames],
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #ok{message = PvtBuffer, info = print_list}
                         }
             end;
         {Socket, invite, GuestSocket, Requester, Guest, RoomName} ->

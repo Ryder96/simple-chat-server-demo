@@ -20,9 +20,23 @@ room_manager(MessageHandler, Owner, RoomName, Users) ->
                             message =
                                 #system{message = io_lib:format("~p enter the room", [User])}
                         },
+
+                    OldMessages = chat_server_dynamodb:fetch_messages(RoomName, Owner),
+                    Messages = lists:map(
+                        fun(Message) ->
+                            Message#message_ddb.sender ++ ": " ++ Message#message_ddb.body
+                        end,
+                        OldMessages
+                    ),
+
                     MessageHandler !
                         #direct_message{
                             socket = Socket, message = #ok{message = "you entered the room"}
+                        },
+
+                    MessageHandler !
+                        #direct_message{
+                            socket = Socket, message = #ok{message = Messages, info = print_list}
                         },
                     room_manager(MessageHandler, Owner, RoomName, Users2);
                 _ ->
@@ -42,6 +56,9 @@ room_manager(MessageHandler, Owner, RoomName, Users) ->
                 },
             room_manager(MessageHandler, Owner, RoomName, Users2);
         {message, Sender, Message} ->
+            chat_server_dynamodb:save_message(RoomName, Owner, #message{
+                sender = Sender, message = Message
+            }),
             MessageHandler !
                 #broadcast_message{
                     clients = Users,
