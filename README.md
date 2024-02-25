@@ -40,3 +40,8 @@ Users can create public and private rooms and destroy them only if they are the 
 ### DynamoDB
 
 DynamoDB is used to save the rooms created by the users and the messages sent.
+
+### DockerCompose
+
+Attention table should be created by the container app-node if it fails try to relaunch it. Only the first time executing `docker-componse up`.
+After the table is created start the server.

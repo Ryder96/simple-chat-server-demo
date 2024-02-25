@@ -1,0 +1,44 @@
+services:
+  dynamodb:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    container_name: dynamodb-local
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+  app-node:
+    depends_on:
+      - dynamodb
+    image: amazon/aws-cli
+    container_name: app-node
+    ports:
+     - "8080:8080"
+    environment:
+      AWS_ACCESS_KEY_ID: 'DUMMYIDEXAMPLE'
+      AWS_SECRET_ACCESS_KEY: 'DUMMYEXAMPLEKEY'
+    command: |
+      dynamodb create-table --cli-input-json '{ "AttributeDefinitions": [ { "AttributeName": "Name", "AttributeType": "S" }, { "AttributeName": "Owner", "AttributeType": "S" } ], "TableName": "Rooms", "KeySchema": [ { "AttributeName": "Name", "KeyType": "HASH" }, { "AttributeName": "Owner", "KeyType": "RANGE" } ], "ProvisionedThroughput": { "ReadCapacityUnits": 10, "WriteCapacityUnits": 10 } }' --endpoint-url http://dynamodb:8000 --region eu-west-1
+  server:
+    build: .
+    ports:
+      - "5678:5678"
+    depends_on:
+      - dynamodb
+    environment:
+    - DYNAMODB_HOST=dynamodb
+    - DYNAMODB_PORT=8000
+  client1:
+    build: .
+    depends_on:
+      - server
+    environment:
+      - SERVER_HOST=server
+      - SERVER_PORT=5678
+  client2:
+    build: .
+    depends_on:
+      - server
+    environment:
+      - SERVER_HOST=server
+      - SERVER_PORT=5678

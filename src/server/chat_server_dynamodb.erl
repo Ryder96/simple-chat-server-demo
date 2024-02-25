@@ -16,13 +16,28 @@ start() ->
     connect_to_dynamo().
 
 connect_to_dynamo() ->
-    erlcloud_ddb2:configure(
-        "12345",
-        "secretpassword",
-        ?dynamodb_host,
-        ?dynamodb_port,
-        "http://"
-    ).
+    DynamoHost = os:getenv("DYNAMODB_HOST"),
+    DynamoPort = os:getenv("DYNAMODB_PORT"),
+    
+    case {DynamoHost, DynamoPort} of
+    {false, _} -> 
+        erlcloud_ddb2:configure(
+            "12345",
+            "secretpassword",
+            ?dynamodb_host,
+            ?dynamodb_port,
+            "http://"
+        );
+    {Host, Port} when Host /= false, Port /= false ->
+        {ParsedPort, _} = string:to_integer(Port),
+        erlcloud_ddb2:configure(
+            "12345",
+            "secretpassword",
+            Host,
+            ParsedPort,
+            "http://"
+        )
+end.
 
 create_room(Name, Owner) ->
     create_room(Name, Owner, public).
@@ -159,7 +174,6 @@ authorize(RoomName, Owner, Guest) ->
         ]
     ).
 
-
 parse_response({ok, Response}) when is_list(Response) ->
     Rooms = lists:map(
         fun(Item) ->
@@ -185,11 +199,12 @@ parse_list([H | T]) ->
 parse_list([]) ->
     [].
 
-
 parse_message_map([]) ->
     [];
 parse_message_map([H | T]) ->
     [parse_inner_item(H) | parse_message_map(T)].
 
 parse_inner_item([{<<"body">>, Body}, {<<"sender">>, Sender}, {<<"timestamp">>, Timestamp}]) ->
-    #message_ddb{body = binary_to_list(Body), sender = binary_to_list(Sender), timestamp = Timestamp}.
+    #message_ddb{
+        body = binary_to_list(Body), sender = binary_to_list(Sender), timestamp = Timestamp
+    }.

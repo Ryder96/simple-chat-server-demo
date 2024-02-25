@@ -24,14 +24,35 @@ start() ->
 %%% Connects the client to the server socket
 %%%
 client() ->
-    case
-        gen_tcp:connect(?server_host, ?server_port, [{active, false}, {packet, 2}, {mode, binary}])
-    of
-        {ok, Sock} ->
-            io:format("connected to server~n", []),
-            client(Sock);
-        {error, Reason} ->
-            io:format("server refused connection: ~p~n", [Reason])
+    ServerHost = os:getenv("SERVER_HOST"),
+    ServerPort = os:getenv("SERVER_PORT"),
+
+    case {ServerHost, ServerPort} of
+        {false, _} ->
+            case
+                gen_tcp:connect(?server_host, ?server_port, [
+                    {active, false}, {packet, 2}, {mode, binary}
+                ])
+            of
+                {ok, Sock} ->
+                    io:format("connected to server~n", []),
+                    client(Sock);
+                {error, Reason} ->
+                    io:format("server refused connection: ~p~n", [Reason])
+            end;
+        {Host, Port} when Host /= false, Port /= false ->
+            {ParsedPort, _} = string:to_integer(Port),
+            case
+                gen_tcp:connect(Host, ParsedPort, [
+                    {active, false}, {packet, 2}, {mode, binary}
+                ])
+            of
+                {ok, Sock} ->
+                    io:format("connected to server~n", []),
+                    client(Sock);
+                {error, Reason} ->
+                    io:format("server refused connection: ~p~n", [Reason])
+            end
     end.
 
 %%%
