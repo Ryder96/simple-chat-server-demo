@@ -5,6 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch no shell erlang",
+            "type": "erlang",
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "arguments": "-shell",
+            "preLaunchTask": "r3 compile"
+        },
+
+        {
             "name": "Launch server erlang",
             "type": "erlang",
             "request": "launch",
